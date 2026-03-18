@@ -12,16 +12,20 @@ export async function getStaticPaths() {
 	const paths = [];
 
 	for (const type of postTypes) {
-		const first = await devigo.posts(type).list({ limit: 1, offset: 0 });
-		const totalPages = Math.ceil(first.total / postsPerPage);
+		try {
+			const first = await devigo.posts(type).list({ limit: 1, offset: 0 });
+			const totalPages = Math.ceil(first.total / postsPerPage);
 
-		for (let page = 2; page <= totalPages; page++) {
-			const offset = (page - 1) * postsPerPage;
-			const collection = await devigo.posts(type).list({ limit: postsPerPage, offset });
-			paths.push({
-				params: { type, page: String(page) },
-				props: { type, entries: collection.data, page, totalPages },
-			});
+			for (let page = 2; page <= totalPages; page++) {
+				const offset = (page - 1) * postsPerPage;
+				const collection = await devigo.posts(type).list({ limit: postsPerPage, offset });
+				paths.push({
+					params: { type, page: String(page) },
+					props: { type, entries: collection.data, page, totalPages },
+				});
+			}
+		} catch (error) {
+			console.error(`[devigo] Failed to fetch paginated posts for "${type}":`, error);
 		}
 	}
 

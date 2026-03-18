@@ -12,12 +12,16 @@ export async function getStaticPaths() {
 	const paths = [];
 
 	for (const type of postTypes) {
-		const collection = await devigo.posts(type).list({ limit: postsPerPage, offset: 0 });
-		const totalPages = Math.ceil(collection.total / postsPerPage);
-		paths.push({
-			params: { type },
-			props: { type, entries: collection.data, totalPages },
-		});
+		try {
+			const collection = await devigo.posts(type).list({ limit: postsPerPage, offset: 0 });
+			const totalPages = Math.ceil(collection.total / postsPerPage);
+			paths.push({
+				params: { type },
+				props: { type, entries: collection.data, totalPages },
+			});
+		} catch (error) {
+			console.error(`[devigo] Failed to fetch posts for "${type}":`, error);
+		}
 	}
 
 	return paths;

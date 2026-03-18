@@ -18,12 +18,17 @@ for (const [path, mod] of Object.entries(componentModules)) {
 
 // ── Static mode ─────────────────────────────────────────────────────────────
 export async function getStaticPaths() {
-	const pages = await devigo.pages.list();
-	const fullPages = await Promise.all(pages.map((p) => devigo.pages.get(p.slug)));
-	return fullPages.map((page) => ({
-		params: { slug: page.slug === 'homepage' ? undefined : page.slug },
-		props: { page },
-	}));
+	try {
+		const pages = await devigo.pages.list();
+		const fullPages = await Promise.all(pages.map((p) => devigo.pages.get(p.slug)));
+		return fullPages.map((page) => ({
+			params: { slug: page.slug === 'homepage' ? undefined : page.slug },
+			props: { page },
+		}));
+	} catch (error) {
+		console.error('[devigo] Failed to fetch pages:', error);
+		return [];
+	}
 }
 
 const { page } = Astro.props;
