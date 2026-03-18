@@ -13,7 +13,7 @@ export const devigo = createClient({
 // Post type slugs registered in your Devigo site.
 // Add each post type slug here so that static paths can be generated.
 // Example: ['blog', 'projects', 'team']
-export const postTypes = ['blog'];
+export const postTypes = [];
 
 // Number of entries shown per page on post type listings.
 export const postsPerPage = 10;

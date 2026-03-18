@@ -25,6 +25,6 @@ export default defineConfig({
       environment: env.ENVIRONMENT,
       // Post types to watch for live reload in dev mode.
       // Keep in sync with postTypes in src/lib/devigo.js.
-      postTypes: ['blog'],
+      postTypes: [],
   	})],
 });
