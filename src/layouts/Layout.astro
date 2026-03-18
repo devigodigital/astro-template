@@ -6,6 +6,7 @@
 import { devigo } from '../lib/devigo.js';
 import Header from '../components/menus/Header.astro';
 import Footer from '../components/menus/Footer.astro';
+import ConsentBanner from '../components/ConsentBanner.astro';
 
 const { title, description, ogImage } = Astro.props;
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
@@ -15,6 +16,14 @@ const [headerMenu, footerMenu] = await Promise.all([
 	devigo.menus.get('header').catch(() => ({ items: [] })),
 	devigo.menus.get('footer').catch(() => ({ items: [] })),
 ]);
+
+// Pass credentials to the client-side tracking script via data attributes.
+// These are already public (sent in every API request from the browser).
+const trackingConfig = {
+	baseUrl: import.meta.env.DEVIGO_API_DOMAIN,
+	siteId: import.meta.env.DEVIGO_SITE_ID,
+	token: import.meta.env.DEVIGO_API_TOKEN,
+};
 ---
 
 <!doctype html>
@@ -49,5 +58,67 @@ const [headerMenu, footerMenu] = await Promise.all([
 			<slot />
 		</main>
 		<Footer items={footerMenu.items} />
+		<ConsentBanner />
+
+		<script
+			is:inline
+			data-base-url={trackingConfig.baseUrl}
+			data-site-id={trackingConfig.siteId}
+			data-token={trackingConfig.token}
+		>
+			(function () {
+				var script = document.currentScript;
+				var baseUrl = script.getAttribute('data-base-url').replace(/\/$/, '');
+				var siteId = script.getAttribute('data-site-id');
+				var token = script.getAttribute('data-token');
+				var endpoint = baseUrl + '/api/display/' + siteId + '/track';
+
+				function track() {
+					if (localStorage.getItem('devigo_consent') !== 'true') return;
+
+					var params = new URLSearchParams(window.location.search);
+					var payload = {
+						url: window.location.href,
+						referrer: document.referrer || null,
+						utm_source: params.get('utm_source') || null,
+						utm_medium: params.get('utm_medium') || null,
+						utm_campaign: params.get('utm_campaign') || null,
+						user_agent: navigator.userAgent,
+						screen_width: window.innerWidth,
+					};
+
+					fetch(endpoint, {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json',
+							'Authorization': 'Bearer ' + token,
+						},
+						body: JSON.stringify(payload),
+						keepalive: true,
+					}).catch(function () {});
+				}
+
+				// Expose for ConsentBanner to call on first accept
+				window.__devigoTrack = track;
+
+				// Track initial page load
+				track();
+
+				// Track client-side navigation (SPA)
+				window.addEventListener('popstate', track);
+
+				var originalPushState = history.pushState;
+				history.pushState = function () {
+					originalPushState.apply(history, arguments);
+					track();
+				};
+
+				var originalReplaceState = history.replaceState;
+				history.replaceState = function () {
+					originalReplaceState.apply(history, arguments);
+					track();
+				};
+			})();
+		</script>
 	</body>
 </html>

@@ -1,6 +1,7 @@
 ---
 // ConsentBanner.astro
-// Drop into Layout.astro after the Devigo SDK is initialised.
+// Renders a consent banner for analytics tracking.
+// If the user has already made a choice, the banner does not render.
 // Completely unstyled — apply your own CSS as needed.
 ---
 
@@ -17,25 +18,20 @@
         var banner = document.getElementById('devigo-consent-banner');
         if (!banner) return;
 
-        // If consent is already recorded, hide the banner immediately
         var stored = localStorage.getItem('devigo_consent');
         if (stored !== null) {
             banner.remove();
             return;
         }
 
-        document.getElementById('devigo-consent-accept').addEventListener('click', function () {
-            if (typeof Devigo !== 'undefined' && devigo.analytics.consent) {
-                devigo.analytics.consent(true);
-            }
+        document.getElementById('devigo-consent-accept')?.addEventListener('click', function () {
             localStorage.setItem('devigo_consent', 'true');
             banner.remove();
+            // Trigger first track now that consent was just granted
+            window.__devigoTrack?.();
         });
 
-        document.getElementById('devigo-consent-decline').addEventListener('click', function () {
-            if (typeof Devigo !== 'undefined' && devigo.analytics.consent) {
-                devigo.analytics.consent(false);
-            }
+        document.getElementById('devigo-consent-decline')?.addEventListener('click', function () {
             localStorage.setItem('devigo_consent', 'false');
             banner.remove();
         });
