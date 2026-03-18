@@ -1,0 +1,22 @@
+---
+// Recursive menu renderer — handles unlimited nesting depth.
+// Accepts an array of Devigo menu item objects and renders them as nested lists.
+// To style, target the <li> and nested <ul> elements.
+
+const { items } = Astro.props;
+---
+
+{items.map((item) => (
+	<li>
+		{item.url ? (
+			<a href={item.url} target={item.target}>{item.label}</a>
+		) : (
+			<span>{item.label}</span>
+		)}
+		{item.children && item.children.length > 0 && (
+			<ul>
+				<Astro.self items={item.children} />
+			</ul>
+		)}
+	</li>
+))}

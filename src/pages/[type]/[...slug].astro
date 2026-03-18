@@ -1,0 +1,52 @@
+---
+// Individual post type entry page (e.g. /blog/my-post).
+//
+// Static mode (default): getStaticPaths fetches all entries across all post types.
+// SSR mode: comment out getStaticPaths and uncomment the SSR block below.
+
+import { devigo, postTypes } from '../../lib/devigo.js';
+import Layout from '../../layouts/Layout.astro';
+
+// ── Static mode ─────────────────────────────────────────────────────────────
+export async function getStaticPaths() {
+	const paths = [];
+
+	for (const type of postTypes) {
+		const collection = await devigo.posts(type).list();
+		for (const entry of collection.data) {
+			paths.push({
+				params: { type, slug: entry.slug },
+				props: { type, entry },
+			});
+		}
+	}
+
+	return paths;
+}
+
+const { entry } = Astro.props;
+
+// ── SSR mode (uncomment this block and remove getStaticPaths above) ─────────
+// const { type, slug } = Astro.params;
+// const entry = await devigo.posts(type).get(slug);
+// ─────────────────────────────────────────────────────────────────────────────
+
+const title = entry.field_values?.title || entry.slug;
+const description = entry.field_values?.excerpt as string | undefined;
+---
+
+<Layout title={title} description={description}>
+	<article>
+		{Object.entries(entry.field_values ?? {}).map(([key, value]) => (
+			key !== 'title' && (
+				<div data-field={key}>
+					{typeof value === 'string' ? (
+						<Fragment set:html={value} />
+					) : (
+						<pre>{JSON.stringify(value, null, 2)}</pre>
+					)}
+				</div>
+			)
+		))}
+	</article>
+</Layout>

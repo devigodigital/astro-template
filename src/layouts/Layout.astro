@@ -1,0 +1,53 @@
+---
+// Base layout — wraps every page.
+// Fetches the header and footer menus from Devigo and passes them to the
+// Header and Footer components. Accepts a `title` prop for the <title> tag.
+
+import { devigo } from '../lib/devigo.js';
+import Header from '../components/menus/Header.astro';
+import Footer from '../components/menus/Footer.astro';
+
+const { title, description, ogImage } = Astro.props;
+const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+
+// Fetch menus — these calls run at build time (static) or per-request (SSR).
+const [headerMenu, footerMenu] = await Promise.all([
+	devigo.menus.get('header').catch(() => ({ items: [] })),
+	devigo.menus.get('footer').catch(() => ({ items: [] })),
+]);
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<link rel="canonical" href={canonicalURL} />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+		<title>{title}</title>
+		{description && <meta name="description" content={description} />}
+
+		<!-- Open Graph -->
+		<meta property="og:type" content="website" />
+		<meta property="og:url" content={canonicalURL} />
+		<meta property="og:title" content={title} />
+		{description && <meta property="og:description" content={description} />}
+		{ogImage && <meta property="og:image" content={ogImage} />}
+
+		<!-- Twitter -->
+		<meta name="twitter:card" content={ogImage ? 'summary_large_image' : 'summary'} />
+		<meta name="twitter:title" content={title} />
+		{description && <meta name="twitter:description" content={description} />}
+		{ogImage && <meta name="twitter:image" content={ogImage} />}
+
+		<meta name="generator" content={Astro.generator} />
+	</head>
+	<body>
+		<Header items={headerMenu.items} />
+		<main>
+			<slot />
+		</main>
+		<Footer items={footerMenu.items} />
+	</body>
+</html>

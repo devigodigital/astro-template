@@ -1,0 +1,40 @@
+---
+// Post type listing — page 1 (e.g. /blog).
+//
+// Post types are defined in src/lib/devigo.js — add your slugs there.
+
+import { devigo, postTypes, postsPerPage } from '../../lib/devigo.js';
+import Layout from '../../layouts/Layout.astro';
+import PostList from '../../components/PostList.astro';
+
+// ── Static mode ─────────────────────────────────────────────────────────────
+export async function getStaticPaths() {
+	const paths = [];
+
+	for (const type of postTypes) {
+		const collection = await devigo.posts(type).list({ limit: postsPerPage, offset: 0 });
+		const totalPages = Math.ceil(collection.total / postsPerPage);
+		paths.push({
+			params: { type },
+			props: { type, entries: collection.data, totalPages },
+		});
+	}
+
+	return paths;
+}
+
+const { type, entries, totalPages } = Astro.props;
+
+// ── SSR mode (uncomment this block and remove getStaticPaths above) ─────────
+// const type = Astro.params.type;
+// const page = Number(Astro.url.searchParams.get('page') || '1');
+// const offset = (page - 1) * postsPerPage;
+// const collection = await devigo.posts(type).list({ limit: postsPerPage, offset });
+// const entries = collection.data;
+// const totalPages = Math.ceil(collection.total / postsPerPage);
+// ─────────────────────────────────────────────────────────────────────────────
+---
+
+<Layout title={type}>
+	<PostList type={type} entries={entries} page={1} totalPages={totalPages} />
+</Layout>

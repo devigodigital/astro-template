@@ -1,0 +1,45 @@
+---
+// Paginated post type listing (e.g. /blog/page/2).
+//
+// Page 1 is handled by [type]/index.astro — this route covers page 2+.
+
+import { devigo, postTypes, postsPerPage } from '../../../lib/devigo.js';
+import Layout from '../../../layouts/Layout.astro';
+import PostList from '../../../components/PostList.astro';
+
+// ── Static mode ─────────────────────────────────────────────────────────────
+export async function getStaticPaths() {
+	const paths = [];
+
+	for (const type of postTypes) {
+		const first = await devigo.posts(type).list({ limit: 1, offset: 0 });
+		const totalPages = Math.ceil(first.total / postsPerPage);
+
+		for (let page = 2; page <= totalPages; page++) {
+			const offset = (page - 1) * postsPerPage;
+			const collection = await devigo.posts(type).list({ limit: postsPerPage, offset });
+			paths.push({
+				params: { type, page: String(page) },
+				props: { type, entries: collection.data, page, totalPages },
+			});
+		}
+	}
+
+	return paths;
+}
+
+const { type, entries, page, totalPages } = Astro.props;
+
+// ── SSR mode (uncomment this block and remove getStaticPaths above) ─────────
+// const type = Astro.params.type;
+// const page = Number(Astro.params.page || '1');
+// const offset = (page - 1) * postsPerPage;
+// const collection = await devigo.posts(type).list({ limit: postsPerPage, offset });
+// const entries = collection.data;
+// const totalPages = Math.ceil(collection.total / postsPerPage);
+// ─────────────────────────────────────────────────────────────────────────────
+---
+
+<Layout title={`${type} — Page ${page}`}>
+	<PostList type={type} entries={entries} page={page} totalPages={totalPages} />
+</Layout>

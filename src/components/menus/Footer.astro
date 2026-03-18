@@ -1,0 +1,16 @@
+---
+// Site footer — renders the footer navigation menu.
+// Receives menu items from Layout.astro. Style the <footer>, <nav>, and <ul> as needed.
+
+import MenuItems from './MenuItems.astro';
+
+const { items } = Astro.props;
+---
+
+<footer style="padding: 16px 24px; border-top: 1px solid #777777;">
+	<nav>
+		<ul style="list-style: none; margin: 0; padding: 0; display: flex; gap: 24px;">
+			<MenuItems items={items} />
+		</ul>
+	</nav>
+</footer>

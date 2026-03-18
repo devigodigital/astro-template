@@ -1,0 +1,52 @@
+---
+// Dynamic page route — renders all CMS pages (/, /about, /contact, etc.).
+//
+// Static mode (default): getStaticPaths fetches every page at build time.
+// SSR mode: comment out getStaticPaths and uncomment the SSR block below.
+
+import { devigo } from '../lib/devigo.js';
+import Layout from '../layouts/Layout.astro';
+
+// Auto-import all components from src/components for dynamic rendering.
+// Each CMS component name (e.g. "Test") maps to the matching .astro file.
+const componentModules = import.meta.glob('../components/*.astro', { eager: true });
+const components: Record<string, any> = {};
+for (const [path, mod] of Object.entries(componentModules)) {
+	const name = path.split('/').pop()!.replace('.astro', '');
+	components[name] = (mod as any).default;
+}
+
+// ── Static mode ─────────────────────────────────────────────────────────────
+export async function getStaticPaths() {
+	const pages = await devigo.pages.list();
+	const fullPages = await Promise.all(pages.map((p) => devigo.pages.get(p.slug)));
+	return fullPages.map((page) => ({
+		params: { slug: page.slug === 'homepage' ? undefined : page.slug },
+		props: { page },
+	}));
+}
+
+const { page } = Astro.props;
+
+// ── SSR mode (uncomment this block and remove getStaticPaths above) ─────────
+// const slug = Astro.params.slug || 'homepage';
+// const page = await devigo.pages.get(slug);
+// ─────────────────────────────────────────────────────────────────────────────
+---
+
+<Layout title={page.meta?.title || page.name} description={page.meta?.description} ogImage={page.meta?.og_image}>
+	{(page.sections ?? []).map((section) => (
+		<section>
+			{section.rows.map((row) =>
+				row.columns.map((col) =>
+					col.components.map((comp) => {
+						const Component = components[comp.component];
+						return Component
+							? <Component {...(comp.props ?? {})} />
+							: <div data-component={comp.component}>Unknown component: {comp.component}</div>
+					})
+				)
+			)}
+		</section>
+	))}
+</Layout>
