@@ -1,0 +1,43 @@
+---
+// ConsentBanner.astro
+// Drop into Layout.astro after the Devigo SDK is initialised.
+// Completely unstyled — apply your own CSS as needed.
+---
+
+<div id="devigo-consent-banner">
+    <p>This site uses analytics to understand how pages are used. No personal data is stored.</p>
+    <div>
+        <button id="devigo-consent-accept" type="button">Accept</button>
+        <button id="devigo-consent-decline" type="button">Decline</button>
+    </div>
+</div>
+
+<script>
+    (function () {
+        var banner = document.getElementById('devigo-consent-banner');
+        if (!banner) return;
+
+        // If consent is already recorded, hide the banner immediately
+        var stored = localStorage.getItem('devigo_consent');
+        if (stored !== null) {
+            banner.remove();
+            return;
+        }
+
+        document.getElementById('devigo-consent-accept').addEventListener('click', function () {
+            if (typeof Devigo !== 'undefined' && devigo.analytics.consent) {
+                devigo.analytics.consent(true);
+            }
+            localStorage.setItem('devigo_consent', 'true');
+            banner.remove();
+        });
+
+        document.getElementById('devigo-consent-decline').addEventListener('click', function () {
+            if (typeof Devigo !== 'undefined' && devigo.analytics.consent) {
+                devigo.analytics.consent(false);
+            }
+            localStorage.setItem('devigo_consent', 'false');
+            banner.remove();
+        });
+    })();
+</script>
