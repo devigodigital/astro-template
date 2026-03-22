@@ -58,7 +58,7 @@ const trackingConfig = {
 			<slot />
 		</main>
 		<Footer items={footerMenu.items} />
-		<ConsentBanner />
+		<ConsentBanner siteId={trackingConfig.siteId} />
 
 		<script
 			is:inline
@@ -72,9 +72,10 @@ const trackingConfig = {
 				var siteId = script.getAttribute('data-site-id');
 				var token = script.getAttribute('data-token');
 				var endpoint = baseUrl + '/api/display/' + siteId + '/track';
+				var consentKey = 'devigo_consent_' + siteId;
 
 				function track() {
-					if (localStorage.getItem('devigo_consent') !== 'true') return;
+					if (localStorage.getItem(consentKey) !== 'true') return;
 
 					var params = new URLSearchParams(window.location.search);
 					var payload = {

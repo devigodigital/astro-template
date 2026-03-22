@@ -3,9 +3,11 @@
 // Renders a consent banner for analytics tracking.
 // If the user has already made a choice, the banner does not render.
 // Completely unstyled — apply your own CSS as needed.
+
+const { siteId } = Astro.props;
 ---
 
-<div id="devigo-consent-banner">
+<div id="devigo-consent-banner" data-site-id={siteId}>
     <p>This site uses analytics to understand how pages are used. No personal data is stored.</p>
     <div>
         <button id="devigo-consent-accept" type="button">Accept</button>
@@ -13,26 +15,28 @@
     </div>
 </div>
 
-<script>
+<script is:inline>
     (function () {
         var banner = document.getElementById('devigo-consent-banner');
         if (!banner) return;
 
-        var stored = localStorage.getItem('devigo_consent');
+        var siteId = banner.getAttribute('data-site-id');
+        var consentKey = 'devigo_consent_' + siteId;
+
+        var stored = localStorage.getItem(consentKey);
         if (stored !== null) {
             banner.remove();
             return;
         }
 
         document.getElementById('devigo-consent-accept')?.addEventListener('click', function () {
-            localStorage.setItem('devigo_consent', 'true');
+            localStorage.setItem(consentKey, 'true');
             banner.remove();
-            // Trigger first track now that consent was just granted
             window.__devigoTrack?.();
         });
 
         document.getElementById('devigo-consent-decline')?.addEventListener('click', function () {
-            localStorage.setItem('devigo_consent', 'false');
+            localStorage.setItem(consentKey, 'false');
             banner.remove();
         });
     })();
