@@ -18,6 +18,10 @@ export default defineConfig({
 	//   Then add: adapter: node({ mode: 'standalone' })
 	// output: 'server',
 
+	server: {
+		port: Number(env.PORT) || 4321,
+	},
+
 	integrations: [sitemap(), devigoIntegration({
       token: env.DEVIGO_API_TOKEN,
       baseUrl: env.DEVIGO_API_DOMAIN,
