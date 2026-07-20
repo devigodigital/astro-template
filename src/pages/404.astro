@@ -10,19 +10,16 @@
 
 import { devigo, pageTitle, NOT_FOUND_SLUG } from '../lib/devigo.js';
 import Layout from '../layouts/Layout.astro';
-import PageSections from '../components/PageSections.astro';
 
 const page = await devigo.pages.get(NOT_FOUND_SLUG).catch(() => null);
 ---
 
-<Layout title={pageTitle('Page Not Found')} noindex>
-	{page?.sections?.length ? (
-		<PageSections sections={page.sections} />
-	) : (
-		<section>
-			<h1>Page not found</h1>
-			<p>Sorry, the page you're looking for doesn't exist or may have moved.</p>
-			<p><a href="/">Return to the homepage</a></p>
-		</section>
-	)}
+<!-- Layout renders `sections` when the CMS page exists; otherwise the children
+     below are used as the fallback. -->
+<Layout title={pageTitle('Page Not Found')} noindex sections={page?.sections}>
+	<section>
+		<h1>Page not found</h1>
+		<p>Sorry, the page you're looking for doesn't exist or may have moved.</p>
+		<p><a href="/">Return to the homepage</a></p>
+	</section>
 </Layout>

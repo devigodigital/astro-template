@@ -11,6 +11,8 @@
 //   ogType      — 'website' (default) or 'article' for posts.
 //   noindex     — true on pages that must never be indexed (e.g. 404). Drops the canonical.
 //   jsonLd      — an extra schema.org object rendered as ld+json (e.g. BlogPosting).
+//   sections    — a CMS page's sections array. Rendered in place of the children;
+//                 omit it (or pass an empty array) to render children instead.
 
 import { devigo, getSettings, siteName } from '../lib/devigo.js';
 import Header from '../components/menus/Header.astro';
@@ -18,7 +20,27 @@ import Footer from '../components/menus/Footer.astro';
 import ConsentBanner from '../components/ConsentBanner.astro';
 import '../styles/main.css';
 
-const { title, description, ogType = 'website', noindex = false, jsonLd } = Astro.props;
+const { title, description, ogType = 'website', noindex = false, jsonLd, sections } = Astro.props;
+
+// Auto-import every component from src/components so CMS sections can be
+// rendered by name — a CMS component called "Test" maps to Test.astro. Drop a
+// new .astro file in there and it's immediately available to the CMS; there's
+// nothing to register here.
+const componentModules = import.meta.glob('../components/*.astro', { eager: true });
+const components: Record<string, any> = {};
+for (const [path, mod] of Object.entries(componentModules)) {
+	components[path.split('/').pop()!.replace('.astro', '')] = (mod as any).default;
+}
+
+// Match a CMS component name to a file. Try an exact match first, then fall
+// back to a space-stripped name so multi-word display names ("Hero Banner")
+// resolve to PascalCase files ("HeroBanner.astro"). "&" becomes "And" and
+// remaining non-alphanumerics are stripped, so "Content & Image" resolves to
+// "ContentAndImage".
+function resolveComponent(name: string) {
+	const normalised = name.replace(/&/g, 'And').replace(/[^a-zA-Z0-9]/g, '');
+	return components[name] ?? components[name.replace(/\s+/g, '')] ?? components[normalised];
+}
 
 // Fail the build rather than shipping a page with an empty <title> — a silent
 // undefined here is how a whole site goes live with blank titles.
@@ -110,7 +132,22 @@ const trackingConfig = {
 	<body>
 		<Header items={headerMenu.items} logo={settings.header_logo} companyName={siteTitle} />
 		<main>
-			<slot />
+			{sections?.length
+				? sections.map((section) => (
+						<section>
+							{section.rows.map((row) =>
+								row.columns.map((col) =>
+									col.components.map((comp) => {
+										const Component = resolveComponent(comp.component);
+										return Component
+											? <Component {...(comp.props ?? {})} />
+											: <div data-component={comp.component}>Unknown component: {comp.component}</div>
+									})
+								)
+							)}
+						</section>
+					))
+				: <slot />}
 		</main>
 		<Footer
 			items={footerMenu.items}

@@ -15,29 +15,6 @@ const { siteId } = Astro.props;
     </div>
 </div>
 
-<script is:inline>
-    (function () {
-        var banner = document.getElementById('devigo-consent-banner');
-        if (!banner) return;
-
-        var siteId = banner.getAttribute('data-site-id');
-        var consentKey = 'devigo_consent_' + siteId;
-
-        var stored = localStorage.getItem(consentKey);
-        if (stored !== null) {
-            banner.remove();
-            return;
-        }
-
-        document.getElementById('devigo-consent-accept')?.addEventListener('click', function () {
-            localStorage.setItem(consentKey, 'true');
-            banner.remove();
-            window.__devigoTrack?.();
-        });
-
-        document.getElementById('devigo-consent-decline')?.addEventListener('click', function () {
-            localStorage.setItem(consentKey, 'false');
-            banner.remove();
-        });
-    })();
+<script>
+    import '../js/ConsentBanner.js';
 </script>

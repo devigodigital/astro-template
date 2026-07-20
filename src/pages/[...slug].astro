@@ -6,7 +6,6 @@
 
 import { devigo, pageTitle, NOT_FOUND_SLUG } from '../lib/devigo.js';
 import Layout from '../layouts/Layout.astro';
-import PageSections from '../components/PageSections.astro';
 
 // ── Static mode ─────────────────────────────────────────────────────────────
 export async function getStaticPaths() {
@@ -49,6 +48,4 @@ const description = page.meta_description || undefined;
 const ogImage = page.og_image || page.meta?.og_image || undefined;
 ---
 
-<Layout title={title} description={description} ogImage={ogImage}>
-	<PageSections sections={page.sections} />
-</Layout>
+<Layout title={title} description={description} ogImage={ogImage} sections={page.sections} />
