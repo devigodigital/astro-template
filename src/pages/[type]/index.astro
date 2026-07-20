@@ -3,7 +3,7 @@
 //
 // Post types are defined in src/lib/devigo.js — add your slugs there.
 
-import { devigo, postTypes, postsPerPage } from '../../lib/devigo.js';
+import { devigo, postTypes, postsPerPage, pageTitle } from '../../lib/devigo.js';
 import Layout from '../../layouts/Layout.astro';
 import PostList from '../../components/PostList.astro';
 
@@ -11,7 +11,20 @@ import PostList from '../../components/PostList.astro';
 export async function getStaticPaths() {
 	const paths = [];
 
+	// If a CMS page already owns this slug (e.g. a bespoke "blog" page with a
+	// posts block), let it win — skip the generic listing so the routes don't
+	// collide. Astro prioritises /[type] over /[...slug], which would otherwise
+	// shadow the page.
+	let cmsSlugs = new Set();
+	try {
+		cmsSlugs = new Set((await devigo.pages.list()).map((p) => p.slug));
+	} catch (error) {
+		console.error('[devigo] Failed to fetch pages for listing collision check:', error);
+	}
+
 	for (const type of postTypes) {
+		if (cmsSlugs.has(type)) continue;
+
 		try {
 			const collection = await devigo.posts(type).list({ limit: postsPerPage, offset: 0 });
 			const totalPages = Math.ceil(collection.total / postsPerPage);
@@ -29,6 +42,10 @@ export async function getStaticPaths() {
 
 const { type, entries, totalPages } = Astro.props;
 
+// This generic listing only renders when no CMS page owns the slug (see the
+// collision check above), so there's no CMS title_tag — build one from the type.
+const label = type.charAt(0).toUpperCase() + type.slice(1);
+
 // ── SSR mode (uncomment this block and remove getStaticPaths above) ─────────
 // const type = Astro.params.type;
 // const page = Number(Astro.url.searchParams.get('page') || '1');
@@ -39,6 +56,6 @@ const { type, entries, totalPages } = Astro.props;
 // ─────────────────────────────────────────────────────────────────────────────
 ---
 
-<Layout title={type}>
+<Layout title={pageTitle(label)}>
 	<PostList type={type} entries={entries} page={1} totalPages={totalPages} />
 </Layout>

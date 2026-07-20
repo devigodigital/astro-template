@@ -4,7 +4,7 @@
 // Static mode (default): getStaticPaths fetches all entries across all post types.
 // SSR mode: comment out getStaticPaths and uncomment the SSR block below.
 
-import { devigo, postTypes } from '../../lib/devigo.js';
+import { devigo, postTypes, pageTitle, siteName } from '../../lib/devigo.js';
 import Layout from '../../layouts/Layout.astro';
 
 // ── Static mode ─────────────────────────────────────────────────────────────
@@ -35,11 +35,42 @@ const { entry } = Astro.props;
 // const entry = await devigo.posts(type).get(slug);
 // ─────────────────────────────────────────────────────────────────────────────
 
-const title = entry.field_values?.title || entry.slug;
-const description = entry.field_values?.excerpt as string | undefined;
+// The post title lives on the entry itself (entry.name); some post types also
+// carry it in a `title`/`text` field. Never fall back to the slug for <title>
+// unless there's genuinely nothing else.
+const fv = entry.field_values ?? {};
+const postTitle = (entry.name || fv.title || fv.text || entry.slug) as string;
+const title = pageTitle(postTitle);
+
+// Excerpt/standfirst → meta description. If no excerpt field exists, take the
+// first ~155 chars of the body text as a stopgap.
+const excerpt = (fv.excerpt ?? fv.text_1 ?? fv.summary ?? fv.description) as string | undefined;
+const bodyText = typeof fv.markdown_html === 'string'
+	? fv.markdown_html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+	: '';
+const description = excerpt || (bodyText ? `${bodyText.slice(0, 155).trim()}…` : undefined);
+
+// Featured image → social share card for this post.
+const ogImage = typeof fv.image === 'string' ? fv.image : undefined;
+
+// Article schema so search engines treat posts as articles, not generic pages.
+const jsonLd = {
+	'@context': 'https://schema.org',
+	'@type': 'BlogPosting',
+	headline: postTitle,
+	...(description && { description }),
+	...(entry.published_at && { datePublished: entry.published_at }),
+	...(ogImage && { image: ogImage }),
+	mainEntityOfPage: new URL(Astro.url.pathname, Astro.site).href,
+	author: {
+		'@type': 'Organization',
+		name: siteName,
+		url: Astro.site?.href,
+	},
+};
 ---
 
-<Layout title={title} description={description}>
+<Layout title={title} description={description} ogImage={ogImage} ogType="article" jsonLd={jsonLd}>
 	<article>
 		{Object.entries(entry.field_values ?? {}).map(([key, value]) => (
 			key !== 'title' && (

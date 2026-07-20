@@ -1,16 +1,22 @@
 ---
-// Site footer — renders the footer navigation menu.
-// Receives menu items from Layout.astro. Style the <footer>, <nav>, and <ul> as needed.
+// Site footer — renders the footer navigation menu plus the company line.
+// Receives menu items and site settings (logo, company name/number) from
+// Layout.astro. Style the <footer>, <nav>, and <ul> as needed.
 
 import MenuItems from './MenuItems.astro';
 
-const { items } = Astro.props;
+const { items = [], logo, companyName, companyNumber } = Astro.props;
+const year = new Date().getFullYear();
 ---
 
 <footer style="padding: 16px 24px; border-top: 1px solid #777777;">
+	{logo && <img src={logo} alt={companyName} style="display: block; height: 32px; width: auto; margin-bottom: 16px;" />}
 	<nav>
 		<ul style="list-style: none; margin: 0; padding: 0; display: flex; gap: 24px;">
 			<MenuItems items={items} />
 		</ul>
 	</nav>
+	<p style="margin: 16px 0 0;">
+		&copy; {year} {companyName}{companyNumber && <span> &middot; Company no. {companyNumber}</span>}
+	</p>
 </footer>

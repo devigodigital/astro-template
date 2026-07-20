@@ -1,0 +1,28 @@
+---
+// 404 page — built to /404.html, which your web server should serve with a
+// real 404 status for any unmatched URL (nginx: `error_page 404 /404.html`).
+//
+// The content is managed in Devigo Studio as the page whose slug matches
+// NOT_FOUND_SLUG. It's rendered here at build time — NOT as a routable page
+// (it's excluded from [...slug].astro's paths), so it can't be crawled or
+// indexed as a soft 404. If the CMS page is missing or unpublished, a minimal
+// static fallback renders instead.
+
+import { devigo, pageTitle, NOT_FOUND_SLUG } from '../lib/devigo.js';
+import Layout from '../layouts/Layout.astro';
+import PageSections from '../components/PageSections.astro';
+
+const page = await devigo.pages.get(NOT_FOUND_SLUG).catch(() => null);
+---
+
+<Layout title={pageTitle('Page Not Found')} noindex>
+	{page?.sections?.length ? (
+		<PageSections sections={page.sections} />
+	) : (
+		<section>
+			<h1>Page not found</h1>
+			<p>Sorry, the page you're looking for doesn't exist or may have moved.</p>
+			<p><a href="/">Return to the homepage</a></p>
+		</section>
+	)}
+</Layout>

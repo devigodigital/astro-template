@@ -1,21 +1,63 @@
 ---
 // Base layout — wraps every page.
-// Fetches the header and footer menus from Devigo and passes them to the
-// Header and Footer components. Accepts a `title` prop for the <title> tag.
+// Fetches the header/footer menus and site settings from Devigo and passes
+// them to the Header and Footer components, then renders the full document
+// head: title, meta description, canonical, Open Graph, Twitter and JSON-LD.
+//
+// Props:
+//   title       (required) — the <title>. Build it with pageTitle() from src/lib/devigo.js.
+//   description — meta description / og:description / twitter:description.
+//   ogImage     — absolute URL of a page-specific share image. Defaults to /og-card.png.
+//   ogType      — 'website' (default) or 'article' for posts.
+//   noindex     — true on pages that must never be indexed (e.g. 404). Drops the canonical.
+//   jsonLd      — an extra schema.org object rendered as ld+json (e.g. BlogPosting).
 
-import { devigo } from '../lib/devigo.js';
+import { devigo, getSettings, siteName } from '../lib/devigo.js';
 import Header from '../components/menus/Header.astro';
 import Footer from '../components/menus/Footer.astro';
 import ConsentBanner from '../components/ConsentBanner.astro';
 
-const { title, description, ogImage } = Astro.props;
-const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+const { title, description, ogType = 'website', noindex = false, jsonLd } = Astro.props;
 
-// Fetch menus — these calls run at build time (static) or per-request (SSR).
-const [headerMenu, footerMenu] = await Promise.all([
+// Fail the build rather than shipping a page with an empty <title> — a silent
+// undefined here is how a whole site goes live with blank titles.
+if (!title) {
+	throw new Error(`[Layout] Page "${Astro.url.pathname}" has no title. Pass a title prop (CMS title_tag or a fallback).`);
+}
+
+// Social share image — a page/post-specific image (e.g. a post's featured
+// image) wins; everything else falls back to the site-wide card in /public.
+// Must be an absolute URL: scrapers don't resolve relative og:image paths.
+const ogImage = Astro.props.ogImage || new URL('/og-card.png', Astro.site).href;
+
+const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+const isHomepage = Astro.url.pathname === '/';
+
+// Menus + site settings — these calls run at build time (static) or
+// per-request (SSR). Settings provides the logos, company name and number.
+const [headerMenu, footerMenu, settings] = await Promise.all([
 	devigo.menus.get('header').catch(() => ({ items: [] })),
 	devigo.menus.get('footer').catch(() => ({ items: [] })),
+	getSettings().catch(() => ({})),
 ]);
+
+const siteTitle = settings.company_name || siteName;
+
+// Organization schema on the homepage only, built from site settings. Page
+// templates can supply their own schema (e.g. BlogPosting) via the jsonLd prop.
+const organizationSchema = isHomepage
+	? {
+			'@context': 'https://schema.org',
+			'@type': 'Organization',
+			name: siteTitle,
+			url: Astro.site?.href,
+			...(settings.header_logo && { logo: settings.header_logo }),
+			sameAs: (footerMenu.items ?? [])
+				.map((item) => item.url)
+				.filter((url) => typeof url === 'string' && url.startsWith('http')),
+		}
+	: null;
+const schemas = [organizationSchema, jsonLd].filter(Boolean);
 
 // Pass credentials to the client-side tracking script via data attributes.
 // These are already public (sent in every API request from the browser).
@@ -27,37 +69,54 @@ const trackingConfig = {
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="en" class="no-js">
 	<head>
+		<!-- Swap no-js → js before paint so CSS can gate JS-only states
+		     (e.g. scroll reveals) without flashing. -->
+		<script is:inline>
+			document.documentElement.classList.remove('no-js');
+			document.documentElement.classList.add('js');
+		</script>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<link rel="canonical" href={canonicalURL} />
+		{noindex ? <meta name="robots" content="noindex" /> : <link rel="canonical" href={canonicalURL} />}
+		<link rel="icon" href="/favicon.ico" sizes="48x48" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
 		<title>{title}</title>
 		{description && <meta name="description" content={description} />}
 
 		<!-- Open Graph -->
-		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content={siteTitle} />
+		<meta property="og:type" content={ogType} />
 		<meta property="og:url" content={canonicalURL} />
 		<meta property="og:title" content={title} />
 		{description && <meta property="og:description" content={description} />}
-		{ogImage && <meta property="og:image" content={ogImage} />}
+		<meta property="og:image" content={ogImage} />
 
 		<!-- Twitter -->
-		<meta name="twitter:card" content={ogImage ? 'summary_large_image' : 'summary'} />
+		<meta name="twitter:card" content="summary_large_image" />
 		<meta name="twitter:title" content={title} />
 		{description && <meta name="twitter:description" content={description} />}
-		{ogImage && <meta name="twitter:image" content={ogImage} />}
+		<meta name="twitter:image" content={ogImage} />
+
+		{schemas.map((schema) => (
+			<script type="application/ld+json" set:html={JSON.stringify(schema)} />
+		))}
 
 		<meta name="generator" content={Astro.generator} />
 	</head>
 	<body>
-		<Header items={headerMenu.items} />
+		<Header items={headerMenu.items} logo={settings.header_logo} companyName={siteTitle} />
 		<main>
 			<slot />
 		</main>
-		<Footer items={footerMenu.items} />
+		<Footer
+			items={footerMenu.items}
+			logo={settings.footer_logo}
+			companyName={siteTitle}
+			companyNumber={settings.company_number}
+		/>
 		<ConsentBanner siteId={trackingConfig.siteId} />
 
 		<script

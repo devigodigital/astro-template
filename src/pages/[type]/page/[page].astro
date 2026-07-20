@@ -3,7 +3,7 @@
 //
 // Page 1 is handled by [type]/index.astro — this route covers page 2+.
 
-import { devigo, postTypes, postsPerPage } from '../../../lib/devigo.js';
+import { devigo, postTypes, postsPerPage, pageTitle } from '../../../lib/devigo.js';
 import Layout from '../../../layouts/Layout.astro';
 import PostList from '../../../components/PostList.astro';
 
@@ -34,6 +34,8 @@ export async function getStaticPaths() {
 
 const { type, entries, page, totalPages } = Astro.props;
 
+const label = type.charAt(0).toUpperCase() + type.slice(1);
+
 // ── SSR mode (uncomment this block and remove getStaticPaths above) ─────────
 // const type = Astro.params.type;
 // const page = Number(Astro.params.page || '1');
@@ -44,6 +46,6 @@ const { type, entries, page, totalPages } = Astro.props;
 // ─────────────────────────────────────────────────────────────────────────────
 ---
 
-<Layout title={`${type} — Page ${page}`}>
+<Layout title={pageTitle(`${label} — Page ${page}`)}>
 	<PostList type={type} entries={entries} page={page} totalPages={totalPages} />
 </Layout>

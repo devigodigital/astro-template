@@ -1,0 +1,44 @@
+---
+// Renders a CMS page's sections by mapping each CMS component name to the
+// matching .astro file in src/components. Shared by the dynamic page route
+// ([...slug].astro) and the 404 page (404.astro).
+
+// Auto-import all components from src/components for dynamic rendering.
+// Each CMS component name (e.g. "Test") maps to the matching .astro file.
+const componentModules = import.meta.glob('./*.astro', { eager: true });
+const components: Record<string, any> = {};
+for (const [path, mod] of Object.entries(componentModules)) {
+	const name = path.split('/').pop()!.replace('.astro', '');
+	if (name === 'PageSections') continue; // don't self-import
+	components[name] = (mod as any).default;
+}
+
+const { sections = [] } = Astro.props;
+---
+
+{sections.map((section) => (
+	<section>
+		{section.rows.map((row) =>
+			row.columns.map((col) =>
+				col.components.map((comp) => {
+					// Match the CMS component name to a file. Try an exact match
+					// first, then fall back to a space-stripped name so multi-word
+					// display names ("Hero Banner") resolve to PascalCase files
+					// ("HeroBanner.astro"). "&" becomes "And" and remaining
+					// non-alphanumerics are stripped, so "Content & Image"
+					// resolves to "ContentAndImage".
+					const normalised = comp.component
+						.replace(/&/g, 'And')
+						.replace(/[^a-zA-Z0-9]/g, '');
+					const Component =
+						components[comp.component] ??
+						components[comp.component.replace(/\s+/g, '')] ??
+						components[normalised];
+					return Component
+						? <Component {...(comp.props ?? {})} />
+						: <div data-component={comp.component}>Unknown component: {comp.component}</div>
+				})
+			)
+		)}
+	</section>
+))}

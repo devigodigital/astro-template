@@ -2,21 +2,34 @@
 // Recursive menu renderer — handles unlimited nesting depth.
 // Accepts an array of Devigo menu item objects and renders them as nested lists.
 // To style, target the <li> and nested <ul> elements.
+//
+// Internal hrefs pass through internalHref() so links point at the canonical
+// trailing-slash URL and never bounce through a 301 redirect.
 
-const { items } = Astro.props;
+import { internalHref } from '../../lib/url.js';
+
+const { items = [] } = Astro.props;
 ---
 
-{items.map((item) => (
-	<li>
-		{item.url ? (
-			<a href={item.url} target={item.target}>{item.label}</a>
-		) : (
-			<span>{item.label}</span>
-		)}
-		{item.children && item.children.length > 0 && (
-			<ul>
-				<Astro.self items={item.children} />
-			</ul>
-		)}
-	</li>
-))}
+{items.map((item) => {
+	const href = internalHref(item.url);
+	return (
+		<li>
+			{item.url ? (
+				<a
+					href={href}
+					target={item.target}
+					rel={item.target === '_blank' ? 'noopener noreferrer' : undefined}
+					aria-current={Astro.url.pathname === href ? 'page' : undefined}
+				>{item.label}</a>
+			) : (
+				<span>{item.label}</span>
+			)}
+			{item.children && item.children.length > 0 && (
+				<ul>
+					<Astro.self items={item.children} />
+				</ul>
+			)}
+		</li>
+	);
+})}

@@ -1,28 +1,31 @@
 ---
-// Dynamic page route — renders all CMS pages (/, /about, /contact, etc.).
+// Dynamic page route — renders all CMS pages (/, /about/, /contact/, etc.).
 //
 // Static mode (default): getStaticPaths fetches every page at build time.
 // SSR mode: comment out getStaticPaths and uncomment the SSR block below.
 
-import { devigo } from '../lib/devigo.js';
+import { devigo, pageTitle, NOT_FOUND_SLUG } from '../lib/devigo.js';
 import Layout from '../layouts/Layout.astro';
-
-// Auto-import all components from src/components for dynamic rendering.
-// Each CMS component name (e.g. "Test") maps to the matching .astro file.
-const componentModules = import.meta.glob('../components/*.astro', { eager: true });
-const components: Record<string, any> = {};
-for (const [path, mod] of Object.entries(componentModules)) {
-	const name = path.split('/').pop()!.replace('.astro', '');
-	components[name] = (mod as any).default;
-}
+import PageSections from '../components/PageSections.astro';
 
 // ── Static mode ─────────────────────────────────────────────────────────────
 export async function getStaticPaths() {
 	try {
 		const pages = await devigo.pages.list();
-		const fullPages = await Promise.all(pages.map((p) => devigo.pages.get(p.slug)));
+		const fullPages = await Promise.all(
+			pages
+				// The CMS 404 page is rendered by src/pages/404.astro (built to
+				// /404.html and served with a real 404 status by the web server) —
+				// it must not exist as a routable, indexable page or appear in the
+				// sitemap.
+				.filter((p) => p.slug !== NOT_FOUND_SLUG)
+				// The single-page endpoint doesn't return `name`, so carry it over
+				// from the list response — it's the title fallback for pages with
+				// no title_tag set in Devigo Studio.
+				.map(async (p) => ({ ...(await devigo.pages.get(p.slug)), name: p.name })),
+		);
 		return fullPages.map((page) => ({
-			params: { slug: page.slug === 'homepage' ? undefined : page.slug },
+			params: { slug: page.is_homepage ? undefined : page.slug },
 			props: { page },
 		}));
 	} catch (error) {
@@ -37,21 +40,15 @@ const { page } = Astro.props;
 // const slug = Astro.params.slug || 'homepage';
 // const page = await devigo.pages.get(slug);
 // ─────────────────────────────────────────────────────────────────────────────
+
+// SEO fields come back flat on the page object (title_tag / meta_description),
+// set per page in Devigo Studio. Fall back to "{page name} | {site name}" so a
+// page without a title_tag still gets a real title instead of failing the build.
+const title = page.title_tag || pageTitle(page.name);
+const description = page.meta_description || undefined;
+const ogImage = page.og_image || page.meta?.og_image || undefined;
 ---
 
-<Layout title={page.meta?.title || page.name} description={page.meta?.description} ogImage={page.meta?.og_image}>
-	{(page.sections ?? []).map((section) => (
-		<section>
-			{section.rows.map((row) =>
-				row.columns.map((col) =>
-					col.components.map((comp) => {
-						const Component = components[comp.component];
-						return Component
-							? <Component {...(comp.props ?? {})} />
-							: <div data-component={comp.component}>Unknown component: {comp.component}</div>
-					})
-				)
-			)}
-		</section>
-	))}
+<Layout title={title} description={description} ogImage={ogImage}>
+	<PageSections sections={page.sections} />
 </Layout>
