@@ -82,6 +82,23 @@ const organizationSchema = isHomepage
 	: null;
 const schemas = [organizationSchema, jsonLd].filter(Boolean);
 
+// JSON.stringify escapes quotes and backslashes but leaves `<` alone, so a CMS
+// value containing "</script>" would close this block early and everything
+// after it would parse as markup. Escaping `<` and the line separators (legal
+// in JSON, fatal in a script body) keeps the payload inert. The output is still
+// valid JSON — < decodes back to `<` for any parser reading the schema.
+function serialiseJsonLd(schema: unknown): string {
+	// U+2028 and U+2029 are legal inside a JSON string but are line terminators
+	// to a JS parser, so they break the block just as surely as `<` does.
+	const ESCAPES: Record<string, string> = {
+		'<': '\\u003c',
+		'\u2028': '\\u2028',
+		'\u2029': '\\u2029',
+	};
+
+	return JSON.stringify(schema).replace(/[<\u2028\u2029]/g, (ch) => ESCAPES[ch]);
+}
+
 // Pass credentials to the client-side tracking script via data attributes.
 // These are already public (sent in every API request from the browser).
 const trackingConfig = {
@@ -124,7 +141,7 @@ const trackingConfig = {
 		<meta name="twitter:image" content={ogImage} />
 
 		{schemas.map((schema) => (
-			<script type="application/ld+json" set:html={JSON.stringify(schema)} />
+			<script type="application/ld+json" set:html={serialiseJsonLd(schema)} />
 		))}
 
 		<meta name="generator" content={Astro.generator} />

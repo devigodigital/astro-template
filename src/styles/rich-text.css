@@ -1,0 +1,50 @@
+/*
+Rich text
+---------
+Content from the rich text editor arrives unclassed — bare <h2>, <p>, <ul>,
+<table> and so on. That's deliberate: it inherits whatever you've set for those
+elements globally, so rich text looks like the rest of the site without being
+styled twice.
+
+So there are no type sizes, weights, colours or margins here. Style h1–h6, p, a,
+lists and tables in your own stylesheet and the body content follows.
+
+What's left is the handful of rules that stop the editor's output breaking the
+layout — the places where it isn't quite ordinary markup.
+*/
+
+/*
+Wide tables scroll inside their own container instead of pushing the page
+sideways on mobile. The wrapper element is added at render time by wrapTables()
+in src/lib/richtext.js; this rule is what makes it do anything, so the two have
+to stay together.
+*/
+.rich-text__table-wrap {
+	overflow-x: auto;
+	-webkit-overflow-scrolling: touch;
+}
+
+/*
+Pasted images carry their original intrinsic width, which is routinely wider
+than the column they land in.
+*/
+.rich-text img {
+	max-width: 100%;
+	height: auto;
+}
+
+/*
+The editor wraps list item text in <p>. Left as a block, every bullet would
+break onto its own line below its marker.
+*/
+.rich-text li > p {
+	display: inline;
+}
+
+/*
+Pasted code blocks keep their original line lengths, so they need somewhere to
+overflow to.
+*/
+.rich-text pre {
+	overflow-x: auto;
+}
