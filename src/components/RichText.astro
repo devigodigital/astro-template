@@ -1,0 +1,32 @@
+---
+// Rich text body content.
+//
+// Doubles as a CMS component and a plain Astro component:
+//   • CMS — a component named "Rich Text" in Devigo Studio resolves here, and
+//     its field_values arrive as props. The body field is found by key
+//     (`richtext`, and the markdown/wysiwyg fields it replaced).
+//   • Direct — <RichText html={someHtml} /> when you already have the string.
+//
+// The HTML is sanitised against the allow-list in src/lib/richtext.js on the
+// way in. Never bypass this component with a bare `set:html` on CMS content.
+//
+// The content is unclassed, so it inherits your global element styles;
+// rich-text.css only carries the structural rules that keep the editor's output
+// from breaking the layout.
+//
+// Props:
+//   html    — the rich text HTML. Omit to pick it out of the remaining props.
+//   class   — extra classes on the wrapper, alongside `rich-text`.
+//   embeds  — true to permit YouTube/Vimeo iframes. Off by default; see
+//             sanitizeRichText() for why it's opt-in.
+
+import { pickRichText, sanitizeRichText, wrapTables } from '../lib/richtext.js';
+import '../styles/rich-text.css';
+
+const { html, class: className, embeds = false, ...fields } = Astro.props;
+
+const source = typeof html === 'string' ? html : pickRichText(fields).html;
+const content = wrapTables(sanitizeRichText(source, { allowEmbeds: embeds }));
+---
+
+{content && <div class:list={['rich-text', className]} set:html={content} />}

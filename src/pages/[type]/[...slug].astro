@@ -5,7 +5,9 @@
 // SSR mode: comment out getStaticPaths and uncomment the SSR block below.
 
 import { devigo, postTypes, pageTitle, siteName } from '../../lib/devigo.js';
+import { pickRichText, excerptFrom, extractLeadingHeading } from '../../lib/richtext.js';
 import Layout from '../../layouts/Layout.astro';
+import RichText from '../../components/RichText.astro';
 
 // ── Static mode ─────────────────────────────────────────────────────────────
 export async function getStaticPaths() {
@@ -35,20 +37,27 @@ const { entry } = Astro.props;
 // const entry = await devigo.posts(type).get(slug);
 // ─────────────────────────────────────────────────────────────────────────────
 
-// The post title lives on the entry itself (entry.name); some post types also
-// carry it in a `title`/`text` field. Never fall back to the slug for <title>
-// unless there's genuinely nothing else.
 const fv = entry.field_values ?? {};
-const postTitle = (entry.name || fv.title || fv.text || entry.slug) as string;
+
+// Body content — the rich text field, falling back to the markdown/wysiwyg
+// fields it replaced. `bodyKey` is kept so the field isn't also rendered by the
+// scaffold loop further down.
+const { key: bodyKey, html: rawBody } = pickRichText(fv);
+
+// A pasted document that opens with its own H1 carries the real post title in
+// that heading. Promote it and drop it from the body, so the page has one H1.
+const { title: authoredTitle, html: body } = extractLeadingHeading(rawBody);
+
+// An authored H1 wins, then the entry itself (entry.name); some post types also
+// carry the title in a `title`/`text` field. Never fall back to the slug for
+// <title> unless there's genuinely nothing else.
+const postTitle = (authoredTitle || entry.name || fv.title || fv.text || entry.slug) as string;
 const title = pageTitle(postTitle);
 
 // Excerpt/standfirst → meta description. If no excerpt field exists, take the
-// first ~155 chars of the body text as a stopgap.
+// opening of the body text as a stopgap.
 const excerpt = (fv.excerpt ?? fv.text_1 ?? fv.summary ?? fv.description) as string | undefined;
-const bodyText = typeof fv.markdown_html === 'string'
-	? fv.markdown_html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
-	: '';
-const description = excerpt || (bodyText ? `${bodyText.slice(0, 155).trim()}…` : undefined);
+const description = excerpt || excerptFrom(body);
 
 // Featured image → social share card for this post.
 const ogImage = typeof fv.image === 'string' ? fv.image : undefined;
@@ -72,16 +81,23 @@ const jsonLd = {
 
 <Layout title={title} description={description} ogImage={ogImage} ogType="article" jsonLd={jsonLd}>
 	<article>
-		{Object.entries(entry.field_values ?? {}).map(([key, value]) => (
-			key !== 'title' && (
+		<h1>{postTitle}</h1>
+		<RichText html={body} />
+
+		<!--
+			Scaffold: dumps whatever other fields the post type defines, so you can
+			see what's available while building the real template. Delete this block
+			and render the fields you actually want.
+
+			Values are rendered as *text*, not HTML — only rich text goes through
+			set:html, and only after RichText has sanitised it.
+		-->
+		{Object.entries(fv)
+			.filter(([key]) => key !== bodyKey && key !== 'title')
+			.map(([key, value]) => (
 				<div data-field={key}>
-					{typeof value === 'string' ? (
-						<Fragment set:html={value} />
-					) : (
-						<pre>{JSON.stringify(value, null, 2)}</pre>
-					)}
+					{typeof value === 'string' ? value : <pre>{JSON.stringify(value, null, 2)}</pre>}
 				</div>
-			)
-		))}
+			))}
 	</article>
 </Layout>

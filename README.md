@@ -14,19 +14,22 @@ Devigo Studio is a headless CMS. You manage pages, posts, menus, and media insid
 
 ```
 src/
-  lib/
-    devigo.js               # SDK client + post type config
   layouts/
     Layout.astro            # HTML shell — head/SEO, menus, site settings
   lib/
     devigo.js               # SDK client + site config (site name, post types)
     url.js                  # internalHref() — canonical trailing-slash links
+    richtext.js             # Sanitises CMS rich text before it reaches set:html
   components/
     PageSections.astro      # Maps CMS component names to .astro files
+    RichText.astro          # Renders rich text body content, sanitised
     menus/
       Header.astro          # Renders the logo + header menu
       Footer.astro          # Renders the logo, footer menu, company line
       MenuItems.astro       # Recursive menu renderer (unlimited nesting)
+  styles/
+    main.css                # Your global styles
+    rich-text.css           # Structural rules for rich text body content
   pages/
     [...slug].astro         # CMS pages (/, /about/, /contact/, etc.)
     404.astro               # CMS-managed 404, built to /404.html
@@ -44,14 +47,16 @@ src/
 |---|---|
 | `src/lib/devigo.js` | Creates a single SDK client instance using your API token. Also holds the site config you edit: `siteName`, `postTypes`, `postsPerPage`, `NOT_FOUND_SLUG`, plus `getSettings()` and the `pageTitle()` helper. |
 | `src/lib/url.js` | `internalHref()` — normalises internal links to the canonical trailing-slash form so links never bounce through a 301. |
+| `src/lib/richtext.js` | Allow-list sanitiser for CMS rich text, plus helpers for finding the body field and flattening it to plain text. Everything rendered with `set:html` goes through here. See [Rich text](#rich-text). |
 | `src/layouts/Layout.astro` | Wraps every page. Fetches the `header`/`footer` menus and site settings, and renders the whole head: title, meta description, canonical, Open Graph, Twitter card and JSON-LD. |
 | `src/components/PageSections.astro` | Renders a CMS page's sections by matching each CMS component name to a file in `src/components` (`"Hero Banner"` → `HeroBanner.astro`, `"Content & Image"` → `ContentAndImage.astro`). |
+| `src/components/RichText.astro` | Renders rich text body content, sanitised. Doubles as the CMS component a "Rich Text" block resolves to. |
 | `src/components/menus/MenuItems.astro` | Takes an array of menu items and renders them as nested `<ul>`/`<li>` elements. Calls itself recursively for child items, so nesting depth is unlimited. |
 | `src/pages/[...slug].astro` | Catches all top-level slugs. Fetches pages from Devigo and renders their sections via `PageSections`. |
 | `src/pages/404.astro` | Renders the CMS page whose slug is `NOT_FOUND_SLUG` (falls back to static copy). Built to `/404.html`, marked `noindex`, and excluded from routable pages and the sitemap. |
 | `src/pages/llms.txt.ts` | Generates `/llms.txt` — a plain-text index of pages and posts for LLMs and crawlers. |
 | `src/pages/[type]/index.astro` | Generates a listing page for each post type defined in `postTypes` (e.g. `/blog/`). Skipped if a CMS page already owns that slug. |
-| `src/pages/[type]/[...slug].astro` | Generates an individual page for every post entry across all post types (e.g. `/blog/my-post/`). |
+| `src/pages/[type]/[...slug].astro` | Generates an individual page for every post entry across all post types (e.g. `/blog/my-post/`). Renders the rich text body, then dumps the remaining fields as a scaffold for you to replace. |
 | `src/pages/[type]/[...slug].md.ts` | Emits a clean markdown version of each post at `/blog/my-post.md` for LLM ingestion; linked from `/llms.txt`. |
 
 ## SEO and metadata
@@ -76,6 +81,68 @@ The share image falls back to `/public/og-card.png` (1200×630). A neutral place
 | `ogType` | `website` (default) or `article`. |
 | `noindex` | Drops the canonical and adds `robots: noindex`. |
 | `jsonLd` | An extra schema.org object rendered as `ld+json`. |
+
+## Rich text
+
+The **rich text** field replaces the older markdown and wysiwyg fields. Its value is raw HTML — usually pasted out of Google Docs or Word — so it can only be rendered with `set:html`. Render it through the `RichText` component, never with a bare `set:html`:
+
+```astro
+---
+import RichText from '../components/RichText.astro';
+---
+<RichText html={someHtml} />
+```
+
+A CMS component named **"Rich Text"** resolves to `RichText.astro` automatically and receives its `field_values` as props, so it also works with no props at all:
+
+```astro
+<RichText {...fields} />
+```
+
+| Prop | What it does |
+|---|---|
+| `html` | The rich text HTML. Omit it and the component finds the body field among the remaining props. |
+| `class` | Extra classes on the wrapper, alongside `rich-text`. |
+| `embeds` | `true` to permit YouTube/Vimeo iframes. Off by default. |
+
+### Sanitisation
+
+Devigo Studio runs an allow-list over rich text when an entry is **saved**, but deliberately never on the way out of storage — and the legacy markdown/wysiwyg values predate that allow-list entirely. So `src/lib/richtext.js` re-sanitises every string on the way to `set:html`, at build time. The allow-list mirrors `HtmlSanitiser::ALLOWED` on the server; **keep the two in step** — anything the server keeps but the template doesn't will silently vanish from the rendered page.
+
+What survives: heading structure (with `id` on headings, for anchor links), paragraphs, lists, tables (including `colspan`/`rowspan`), links, images, and inline formatting. What doesn't: `<script>` and `<style>` (dropped with their contents), `style` and `class` attributes, every `on*` handler, `javascript:` and `data:` URIs, and protocol-relative URLs. Links opening in a new tab get `rel="noopener noreferrer"` forced on.
+
+`<iframe>` is dropped by default — an embed runs third-party code inside your origin's frame tree, so it's opt-in per call via `embeds`, and even then only from the hosts in `EMBED_HOSTNAMES`.
+
+### Finding the body field
+
+Devigo keys a field by its type, suffixing duplicates — so a rich text field lands in `field_values` as `richtext`, a second as `richtext_1`. `pickRichText()` looks for those keys in priority order, falling back to the fields rich text replaced:
+
+```
+richtext → rich_text → wysiwyg → markdown_html
+```
+
+Generic names like `content` and `body` are deliberately **not** matched: a field called `content` is just as likely to be a plain textarea, and routing plain text through `set:html` would mangle any `<` the author typed. If you renamed the field in Devigo Studio, add its key to `RICH_TEXT_KEYS` in `src/lib/richtext.js`.
+
+### Other helpers
+
+`src/lib/richtext.js` also exports, for the places that need the cleaned string rather than rendered markup:
+
+| Function | What it does |
+|---|---|
+| `sanitizeRichText(html, opts)` | The allow-list itself. Returns `''` for non-string input. |
+| `wrapTables(html)` | Wraps each top-level `<table>` so wide tables scroll instead of breaking the layout on mobile. |
+| `pickRichText(fields)` | Finds the body field; returns `{ key, html }` so the key can be excluded elsewhere. |
+| `richTextToPlainText(html)` | Flattens to text for `<title>`, meta descriptions and JSON-LD. |
+| `excerptFrom(html, max)` | A meta-description-sized excerpt, cut on a word boundary. |
+| `extractLeadingHeading(html)` | Pulls a leading `<h1>` off the body so the page keeps exactly one H1. |
+
+### Styling
+
+Rich text arrives unclassed — bare `<h2>`, `<p>`, `<ul>`, `<table>` — so it inherits whatever you've set for those elements globally and looks like the rest of the site without being styled twice. Style `h1`–`h6`, `p`, `a`, lists and tables in your own stylesheet and the body content follows.
+
+`src/styles/rich-text.css` therefore sets **no** type sizes, weights, colours or margins. It carries only the rules that stop the editor's output breaking the layout: the table scroll container, images capped to their column, `<pre>` overflow, and the `display: inline` that keeps list items on one line (the editor wraps `<li>` text in a `<p>`).
+
+It's imported by `RichText.astro` rather than from `main.css`, so the rules travel with the component that needs them. (It ends up on every page regardless — `Layout.astro` eagerly globs `src/components` so CMS blocks resolve by name — but at four rules that's a rounding error, and Astro inlines it.)
 
 ## 404 page
 

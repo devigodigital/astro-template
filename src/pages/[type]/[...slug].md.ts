@@ -4,12 +4,13 @@
 //
 // Static mode: getStaticPaths mirrors the loop in [...slug].astro across every
 // registered post type. GET assembles a standalone markdown document: it
-// prefers the CMS raw `markdown` field, otherwise converts the rendered
-// `markdown_html` to markdown with the string-based converter below (there's no
-// DOM at build time, hence the hand-rolled implementation).
+// prefers the CMS raw `markdown` field, otherwise converts the rich text body
+// to markdown with the string-based converter below (there's no DOM at build
+// time, hence the hand-rolled implementation).
 
 import type { APIRoute } from 'astro';
 import { devigo, postTypes } from '../../lib/devigo.js';
+import { pickRichText, sanitizeRichText } from '../../lib/richtext.js';
 
 // ── getStaticPaths ───────────────────────────────────────────────────────────
 export async function getStaticPaths() {
@@ -40,10 +41,11 @@ export const GET: APIRoute = (ctx) => {
 	const title = pickStr(entry?.name, fv.title, fv.text, entry?.slug) || 'Untitled';
 	const excerpt = pickStr(fv.excerpt, fv.text_1, fv.subtitle, fv.summary, fv.description);
 
+	// A raw `markdown` field, where one still exists, is already in the target
+	// format. Otherwise convert the rich text HTML — sanitised first, so markup
+	// the allow-list rejects can't reach the converter.
 	const rawMd = typeof fv.markdown === 'string' ? fv.markdown.trim() : '';
-	const body = rawMd
-		? rawMd
-		: htmlToMarkdown(typeof fv.markdown_html === 'string' ? fv.markdown_html : pickStr(fv.content, fv.body));
+	const body = rawMd ? rawMd : htmlToMarkdown(sanitizeRichText(pickRichText(fv).html));
 
 	const siteBase = ctx.site instanceof URL ? ctx.site : new URL('https://example.com');
 	const canonical = new URL(`/${type}/${entry.slug}/`, siteBase).href;
